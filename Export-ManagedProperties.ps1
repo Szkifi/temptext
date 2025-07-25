@@ -16,7 +16,7 @@ foreach ($mp in $managedProps) {
     $mappings = $allMappings | Where-Object {
         $_.ManagedPropertyName -eq $mp.Name
     } | ForEach-Object {
-        [PSCustomObject]@{
+        @{
             Name     = $_.CrawledPropertyName
             Category = $_.CrawledCategory
             PropSet  = $_.CrawledPropertySet
