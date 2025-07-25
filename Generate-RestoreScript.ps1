@@ -1,7 +1,7 @@
 # Generate-RestoreScript.ps1
 param (
-    [string]$MissingFile = "MissingInFile2.xml",
-    [string]$DiffFile = "Differences.xml",
+    [string]$MissingFile = "MissingInFile2.json",
+    [string]$DiffFile = "Differences.json",
     [string]$OutScript = "Restore-ManagedProperties.ps1",
     [string]$SearchAppName = "Search Service Application"
 )
@@ -10,23 +10,22 @@ $missing = @()
 $diff = @()
 
 if (Test-Path $MissingFile) {
-    $missing = Import-Clixml -Path $MissingFile
+    $missing = Get-Content -Raw -Path $MissingFile | ConvertFrom-Json
 }
 if (Test-Path $DiffFile) {
-    $diff = Import-Clixml -Path $DiffFile
+    $diff = Get-Content -Raw -Path $DiffFile | ConvertFrom-Json
 }
 
 $lines = @(
     "Add-PSSnapin Microsoft.SharePoint.PowerShell -ErrorAction SilentlyContinue",
-    "`$ssa = Get-SPEnterpriseSearchServiceApplication -Identity `"$SearchAppName`"",
-    "`$schema = Get-SPEnterpriseSearchSchema -SearchApplication `$ssa"
+    "`$ssa = Get-SPEnterpriseSearchServiceApplication -Identity `"$SearchAppName`""
 )
 
 function CreatePropertyBlock($prop) {
     $block = @()
     $block += ""
     $block += "# Creating or updating property: $($prop.Name)"
-    $block += "`$mp = New-SPEnterpriseSearchMetadataManagedProperty -SearchApplication `$ssa -Name `"$($prop.Name)`" -Type $($prop.Type) -Queryable:$($prop.Queryable) -Retrievable:$($prop.Retrievable) -Refinable:$($prop.Refinable) -Sortable:$($prop.Sortable) -SafeForAnonymous:$($prop.SafeForAnonymous)"
+    $block += "`$mp = New-SPEnterpriseSearchMetadataManagedProperty -SearchApplication `$ssa -Name `"$($prop.Name)`" -Type `"$($prop.ManagedType)`" -Queryable:$($prop.Queryable) -Retrievable:$($prop.Retrievable) -Refinable:$($prop.Refinable) -Sortable:$($prop.Sortable) -SafeForAnonymous:$($prop.SafeForAnonymous)"
 
     foreach ($map in $prop.Mappings) {
         $block += "`$cp = Get-SPEnterpriseSearchMetadataCrawledProperty -SearchApplication `$ssa -Category `"$($map.Category)`" | Where-Object { `$_.Name -eq `"$($map.Name)`" -and `$_.PropertySet -eq `"$($map.PropSet)`" }"
