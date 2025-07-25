@@ -1,6 +1,6 @@
 # Export-ManagedProperties.ps1
 param (
-    [string]$OutputFile = "ManagedProperties_$(Get-Date -Format yyyyMMdd_HHmmss).xml",
+    [string]$OutputFile = "ManagedProperties_$(Get-Date -Format yyyyMMdd_HHmmss).json",
     [string]$SearchAppName = "Search Service Application"
 )
 
@@ -10,11 +10,18 @@ $ssa = Get-SPEnterpriseSearchServiceApplication -Identity $SearchAppName
 $managedProps = Get-SPEnterpriseSearchMetadataManagedProperty -SearchApplication $ssa
 $allMappings = Get-SPEnterpriseSearchMetadataMapping -SearchApplication $ssa
 
+# Index managed properties by their ManagedPid for fast lookup
+$mpIndex = @{}
+foreach ($mp in $managedProps) {
+    $mpIndex[$mp.PID] = $mp
+}
+
 $export = @()
 
 foreach ($mp in $managedProps) {
+    $pid = $mp.PID
     $mappings = $allMappings | Where-Object {
-        $_.ManagedPropertyName -eq $mp.Name
+        $_.ManagedPid -eq $pid
     } | ForEach-Object {
         @{
             Name     = $_.CrawledPropertyName
@@ -37,5 +44,5 @@ foreach ($mp in $managedProps) {
     }
 }
 
-$export | Export-Clixml -Path $OutputFile
+$export | ConvertTo-Json -Depth 10 | Out-File -Encoding UTF8 $OutputFile
 Write-Host "Export completed to $OutputFile"
