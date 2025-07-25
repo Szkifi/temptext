@@ -1,0 +1,44 @@
+# Generate-RestoreScript.ps1
+param (
+    [string]$MissingFile = "MissingInFile2.xml",
+    [string]$DiffFile = "Differences.xml",
+    [string]$OutScript = "Restore-ManagedProperties.ps1",
+    [string]$SearchAppName = "Search Service Application"
+)
+
+$missing = @()
+$diff = @()
+
+if (Test-Path $MissingFile) {
+    $missing = Import-Clixml -Path $MissingFile
+}
+if (Test-Path $DiffFile) {
+    $diff = Import-Clixml -Path $DiffFile
+}
+
+$lines = @(
+    "Add-PSSnapin Microsoft.SharePoint.PowerShell -ErrorAction SilentlyContinue",
+    "`$ssa = Get-SPEnterpriseSearchServiceApplication -Identity `"$SearchAppName`"",
+    "`$schema = Get-SPEnterpriseSearchSchema -SearchApplication `$ssa"
+)
+
+function CreatePropertyBlock($prop) {
+    $block = @()
+    $block += ""
+    $block += "# Creating or updating property: $($prop.Name)"
+    $block += "`$mp = New-SPEnterpriseSearchMetadataManagedProperty -SearchApplication `$ssa -Name `"$($prop.Name)`" -Type $($prop.Type) -Queryable:$($prop.Queryable) -Retrievable:$($prop.Retrievable) -Refinable:$($prop.Refinable) -Sortable:$($prop.Sortable) -SafeForAnonymous:$($prop.SafeForAnonymous)"
+
+    foreach ($map in $prop.Mappings) {
+        $block += "`$cp = Get-SPEnterpriseSearchMetadataCrawledProperty -SearchApplication `$ssa -Category `"$($map.Category)`" | Where-Object { `$_.Name -eq `"$($map.Name)`" -and `$_.PropertySet -eq `"$($map.PropSet)`" }"
+        $block += "if (`$cp) { New-SPEnterpriseSearchMetadataMapping -SearchApplication `$ssa -ManagedProperty `$mp -CrawledProperty `$cp }"
+    }
+
+    return $block
+}
+
+foreach ($prop in $missing + $diff) {
+    $lines += CreatePropertyBlock $prop
+}
+
+$lines | Set-Content -Path $OutScript -Encoding UTF8
+Write-Host "Generated import script: $OutScript"
